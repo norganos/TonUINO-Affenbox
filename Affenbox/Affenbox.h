@@ -20,6 +20,9 @@
 #if defined AiO
 #include "Emulated_EEPROM.h"
 #endif
+#if defined LED_SR
+#include <Adafruit_NeoPixel.h>
+#endif
 
 using ace_button::AceButton;
 using ace_button::ButtonConfig;

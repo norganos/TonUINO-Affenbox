@@ -91,7 +91,7 @@
 *- Powerbank mit automatischer Abschaltung -> https://discourse.voss.earth/t/intenso-s10000-powerbank-automatische-abschaltung-software-only/805/5
 */
 
-//#define PUSH_ON_OFF    
+#define PUSH_ON_OFF    
 
 #if defined PUSH_ON_OFF
 
@@ -113,7 +113,7 @@
 *https://discourse.voss.earth/t/geraeusch-beim-start-der-box-allerdings-nicht-bei-jedem-start/1357/34?u=marco-117 
 */
 
-//#define SPEAKER_SWITCH  
+#define SPEAKER_SWITCH  
 
 #if defined SPEAKER_SWITCH
 
@@ -386,6 +386,28 @@ static const uint8_t ANALOG_INPUT_BUTTON_MAP[ANALOG_INPUT_BUTTON_COUNT + 1 ] = {
 //#define NFCgain_max   // Maximale Empfindlichkeit
 #define NFCgain_avg   // Mittlere Empfindlichkeit
 //#define NFCgain_min   // Minimale Empfindlichkeit
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+//===========================================================================
+//========================== NEOPixel Ring ==================================
+//===========================================================================
+/**
+*
+*/
+#define LED_SR
+#if defined LED_SR
+
+/* 
+*Anzahl der LEDs
+ */
+#define LED_COUNT 12
+#define LED_PIN 6                 // Daten für Neopixel-LED-Ring (ButtonBreakout Board "WS" )
+
+#endif
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -1719,6 +1719,103 @@ class RepeatSingleModifier : public Modifier
 //////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////
 
+
+#if defined LED_SR
+
+class NeoPixelRing
+{
+  private:
+    Adafruit_NeoPixel strip;
+    
+    uint8_t lastDetectedVolume;
+    uint16_t volAnimCounter;
+
+    // Main Animation
+    uint32_t  firstPixelHue = 0;
+    uint32_t  pixelHue;
+
+    //-- Vordefinierte Farben -------------
+    uint32_t red = strip.Color(160, 0, 0, 32);
+    uint32_t blank = strip.Color(0, 0, 0, 0);
+
+  public:
+    void loop()
+    {
+      uint8_t currentDetectedVolume = volume;
+      if (currentDetectedVolume != lastDetectedVolume)
+      {
+        volAnimCounter = 1024;
+        lastDetectedVolume = volume;
+      }
+      if (volAnimCounter > 0) {
+        uint8_t vol_range = (mySettings.maxVolume - mySettings.minVolume);
+        uint8_t vol_in_pixels = (volume - mySettings.minVolume) * (LED_COUNT - 1) / vol_range;
+        uint8_t vol_remainder = (volume - mySettings.minVolume) * (LED_COUNT - 1) % vol_range;
+        //TODO: in defines auslagern?
+        uint8_t VolMaxBrightness = 128;
+        uint16_t VolColor = 49152L;
+        for (int i = 0; i < strip.numPixels(); i++)
+        {
+          if (i<=vol_in_pixels){
+                strip.setPixelColor(strip.numPixels()-i-1, strip.ColorHSV(VolColor, 255, VolMaxBrightness)); 
+            }
+          else if (i==vol_in_pixels+1){
+                strip.setPixelColor(strip.numPixels()-i-1, strip.ColorHSV(VolColor, 255, ((vol_remainder * VolMaxBrightness) / vol_range))); 
+            }
+          else{
+                strip.setPixelColor(strip.numPixels()-i-1, strip.ColorHSV(VolColor, 255, 0)); 
+            }
+        }
+ 
+        strip.show();
+
+        volAnimCounter--;
+        return;
+      }
+
+      if (isPlaying()) {
+        for(int i=0; i<strip.numPixels(); i++) {
+          pixelHue = firstPixelHue + (i * 65536L / (strip.numPixels()*1));
+          strip.setPixelColor(strip.numPixels()-1-i, strip.gamma32(strip.ColorHSV(pixelHue, 255, 64)));
+        }
+        strip.show();                // Update strip with new contents
+        
+        firstPixelHue += 32;       // Geschwindigkeit der Animation, je kleiner um so langsamer
+      }
+    }
+
+    void setup()
+    {
+      strip.begin();
+    }
+
+    void shutdown()
+    {
+      for (int l=0; l<2; l++) {
+        for (int j=0; j<strip.numPixels(); j++) {
+          for(int i=0; i<strip.numPixels(); i++) {
+            if (i == j) {
+              strip.setPixelColor(i, blank);
+            } else {
+              strip.setPixelColor(i, red);
+            }
+          }
+          strip.show();
+          delay(70);
+        }
+      }
+    }
+
+    NeoPixelRing()
+    {
+      strip = Adafruit_NeoPixel(LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
+    }
+};
+
+NeoPixelRing *neopixel = new NeoPixelRing();
+#endif
+
+
 //////////////////////////////////////////////////////////////////////////
 void SetVolume(uint8_t volume) {
   mp3.setVolume(volume);
@@ -2453,6 +2550,10 @@ void setup()
   // Set saved Modifier
   if (mySettings.savedModifier.mode != 0)
     SetModifier(&mySettings.savedModifier);
+
+#if defined LED_SR
+  neopixel->setup();
+#endif
 }
 //////////////////////////////////////////////////////////////////////////
 void readButtons(bool invertVolumeButtons = false)
@@ -3004,6 +3105,10 @@ void loop()
 {
   checkStandbyAtMillis();
   mp3.loop();
+
+#if defined LED_SR
+  neopixel->loop();
+#endif
 
 #if defined FADING_LED
   fadeStatusLed(isPlaying());
@@ -4551,6 +4656,10 @@ void shutDown()
   PlayMp3FolderTrack(265);
   delay(1500);
   waitForTrackToFinish();
+
+#if defined LED_SR
+  neopixel->shutdown();
+#endif
 
 #if defined AiO
   // verstärker aus
