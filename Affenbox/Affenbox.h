@@ -107,6 +107,9 @@ struct inputTrigger {
   bool shutDown;
   bool adminMenu;
   bool resetTrack;
+#if defined LED_SR
+  bool toggleLed;
+#endif
   bool shortCutNo [availableShortCuts]; //muss an letzter Stelle stehen bleiben!
 };
 

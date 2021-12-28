@@ -1735,25 +1735,28 @@ class NeoPixelRing
     uint32_t  pixelHue;
 
     //-- Vordefinierte Farben -------------
-    uint32_t red = strip.Color(160, 0, 0, 32);
     uint32_t blank = strip.Color(0, 0, 0, 0);
+    uint32_t red = strip.Color(64, 0, 0, 32);
+    uint32_t blue = strip.Color(16, 16, 64, 32);
+    uint32_t green = strip.Color(0, 64, 0, 32);
+
+    bool enabled;
+    uint16_t lastWrite;
 
   public:
     void loop()
     {
-      uint8_t currentDetectedVolume = volume;
-      if (currentDetectedVolume != lastDetectedVolume)
+      if (volume != lastDetectedVolume)
       {
-        volAnimCounter = 1024;
-        lastDetectedVolume = volume;
-      }
-      if (volAnimCounter > 0) {
         uint8_t vol_range = (mySettings.maxVolume - mySettings.minVolume);
         uint8_t vol_in_pixels = (volume - mySettings.minVolume) * (LED_COUNT - 1) / vol_range;
         uint8_t vol_remainder = (volume - mySettings.minVolume) * (LED_COUNT - 1) % vol_range;
         //TODO: in defines auslagern?
         uint8_t VolMaxBrightness = 128;
-        uint16_t VolColor = 49152L;
+        if (!enabled) {
+          VolMaxBrightness = 64;
+        }
+        uint16_t VolColor = 40960L;
         for (int i = 0; i < strip.numPixels(); i++)
         {
           if (i<=vol_in_pixels){
@@ -1766,10 +1769,22 @@ class NeoPixelRing
                 strip.setPixelColor(strip.numPixels()-i-1, strip.ColorHSV(VolColor, 255, 0)); 
             }
         }
- 
         strip.show();
 
+        volAnimCounter = 8192;
+        lastDetectedVolume = volume;
+        lastWrite = volume;
+      }
+      if (volAnimCounter > 0) {
         volAnimCounter--;
+        return;
+      }
+      if (!enabled) {
+        if (lastWrite != 0) {
+          strip.clear();
+          strip.show();
+          lastWrite = 0;
+        }
         return;
       }
 
@@ -1781,34 +1796,67 @@ class NeoPixelRing
         strip.show();                // Update strip with new contents
         
         firstPixelHue += 32;       // Geschwindigkeit der Animation, je kleiner um so langsamer
+        lastWrite = 32768;
+      } else if (lastWrite != 65536) {
+        for(int i=0; i<strip.numPixels(); i++) {
+          strip.setPixelColor(strip.numPixels()-1-i, blue);
+        }
+        strip.show();    
+        lastWrite = 65536;
       }
     }
 
     void setup()
     {
       strip.begin();
-    }
-
-    void shutdown()
-    {
       for (int l=0; l<2; l++) {
         for (int j=0; j<strip.numPixels(); j++) {
           for(int i=0; i<strip.numPixels(); i++) {
             if (i == j) {
               strip.setPixelColor(i, blank);
             } else {
-              strip.setPixelColor(i, red);
+              strip.setPixelColor(i, green);
             }
           }
           strip.show();
           delay(70);
         }
       }
+      lastDetectedVolume = volume;
+    }
+
+    void toggle()
+    {
+      enabled = !enabled;
+    }
+
+    void shutdown()
+    {
+      if (enabled) {
+        for (int l=0; l<2; l++) {
+          for (int j=0; j<strip.numPixels(); j++) {
+            for(int i=0; i<strip.numPixels(); i++) {
+              if (i == j) {
+                strip.setPixelColor(i, blank);
+              } else {
+                strip.setPixelColor(i, red);
+              }
+            }
+            strip.show();
+            delay(70);
+          }
+        }
+      } else {
+        delay(2 * strip.numPixels() * 70);
+      }
+      strip.clear();
+      strip.show();
     }
 
     NeoPixelRing()
     {
       strip = Adafruit_NeoPixel(LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
+      enabled = true;
     }
 };
 
@@ -2519,8 +2567,13 @@ void setup()
   // load settings & sort cuts from EEPROM
   getSettings();
   getShortCuts();
+  volume = mySettings.initVolume;
 
+#if defined LED_SR
+  neopixel->setup();
+#else
   delay(1500);
+#endif
 
 #if defined AiO
   //  verstärker an
@@ -2536,7 +2589,6 @@ void setup()
   delay(500);
 
   mp3.loop();
-  volume = mySettings.initVolume;
   SetVolume(volume);
   mp3.setEq((DfMp3_Eq)(mySettings.eq - 1));
 
@@ -2550,10 +2602,6 @@ void setup()
   // Set saved Modifier
   if (mySettings.savedModifier.mode != 0)
     SetModifier(&mySettings.savedModifier);
-
-#if defined LED_SR
-  neopixel->setup();
-#endif
 }
 //////////////////////////////////////////////////////////////////////////
 void readButtons(bool invertVolumeButtons = false)
@@ -2623,6 +2671,9 @@ void readButtons(bool invertVolumeButtons = false)
   myTrigger.adminMenu |= (pauseButton.pressedFor(LONG_PRESS) || upButton.pressedFor(LONG_PRESS) || downButton.pressedFor(LONG_PRESS)) &&
                          pauseButton.isPressed() && upButton.isPressed() && downButton.isPressed();
   myTrigger.resetTrack |= (upButton.pressedFor(LONGER_PRESS) || downButton.pressedFor(LONGER_PRESS)) && !pauseButton.isPressed() && upButton.isPressed() && downButton.isPressed();
+#if defined LED_SR
+  myTrigger.toggleLed = (buttonFour.pressedFor(LONGER_PRESS) || buttonFive.pressedFor(LONGER_PRESS)) && !pauseButton.isPressed() && buttonFour.isPressed() && buttonFive.isPressed();
+#endif
 }
 
 #if defined IRREMOTE
@@ -2841,7 +2892,9 @@ void readTrigger(bool invertVolumeButtons /* = false */)
 void checkNoTrigger()
 {
   myTrigger.noTrigger = !(myTrigger.pauseTrack || myTrigger.next || myTrigger.nextPlusTen || myTrigger.previous || myTrigger.previousPlusTen || myTrigger.volumeUp || myTrigger.volumeDown || myTrigger.pauseTrack || myTrigger.cancel || myTrigger.shutDown || myTrigger.adminMenu || myTrigger.resetTrack);
-
+#if defined LED_SR
+  myTrigger.noTrigger &= !myTrigger.toggleLed;
+#endif
   for (uint8_t i = 0; i < availableShortCuts; i++)
   {
     myTrigger.noTrigger &= !myTrigger.shortCutNo[i];
@@ -2866,6 +2919,9 @@ void resetTrigger()
   myTrigger.shutDown = false;
   myTrigger.adminMenu = false;
   myTrigger.resetTrack = false;
+#if defined LED_SR
+  myTrigger.toggleLed = false;
+#endif
 }
 
 void resetTriggerEnable()
@@ -2886,6 +2942,9 @@ void resetTriggerEnable()
   myTriggerEnable.shutDown = true;
   myTriggerEnable.adminMenu = true;
   myTriggerEnable.resetTrack = true;
+#if defined LED_SR
+  myTriggerEnable.toggleLed = true;
+#endif
 }
 //////////////////////////////////////////////////////////////////////////
 void volumeUpAction(bool rapidFire /* = false */)
@@ -3138,6 +3197,13 @@ void loop()
     } while (true);
     adminMenuAction();
   }
+
+#if defined LED_SR
+  if (myTrigger.toggleLed && myTriggerEnable.toggleLed) {
+    myTriggerEnable.toggleLed = false;
+    neopixel->toggle();
+  }
+#endif
 
   //Springe zum ersten Titel zurück
   if (myTrigger.resetTrack && myTriggerEnable.resetTrack)
@@ -4654,12 +4720,12 @@ void shutDown()
   knownCard = false;
   activeShortCut = -1;
   PlayMp3FolderTrack(265);
-  delay(1500);
-  waitForTrackToFinish();
-
 #if defined LED_SR
   neopixel->shutdown();
+#else
+  delay(1500);
 #endif
+  waitForTrackToFinish();
 
 #if defined AiO
   // verstärker aus
